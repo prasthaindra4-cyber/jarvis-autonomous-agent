@@ -1488,6 +1488,129 @@ body {
   gap: 12px;
 }
 
+@media (max-width: 900px) {
+  .sidebar {
+    width: 72px;
+    flex: 0 0 72px;
+    padding: 12px 8px;
+  }
+
+  .brand-header {
+    justify-content: center;
+    padding: 8px 0 16px;
+  }
+
+  .brand-header > div:not(.arc-reactor),
+  .nav-item-left span,
+  .nav-badge,
+  .voice-status-header,
+  .mini-equalizer,
+  .voice-label,
+  .call-jarvis-btn-side {
+    display: none;
+  }
+
+  .nav-item,
+  .nav-item-left {
+    justify-content: center;
+  }
+
+  .nav-item {
+    padding: 12px 6px;
+  }
+
+  .voice-status-box {
+    padding: 10px 4px;
+  }
+
+  .top-bar {
+    height: auto;
+    min-height: 58px;
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .system-status-pill,
+  .operator-profile {
+    display: none;
+  }
+
+  .digital-clock-center {
+    margin-right: auto;
+  }
+
+  .top-bar-right {
+    gap: 8px;
+  }
+
+  .search-input-box input {
+    width: min(22vw, 150px);
+  }
+
+  .dashboard-content {
+    padding: 10px 12px 80px;
+  }
+
+  .grid-top-row,
+  .grid-middle-row,
+  .grid-bottom-row {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .center-holo-container {
+    min-height: 220px;
+  }
+
+  .call-modal-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .call-hud-window {
+    width: min(650px, 100%);
+    max-width: 100%;
+    min-height: 100%;
+    border-radius: 0;
+  }
+}
+
+@media (max-height: 700px) {
+  .call-modal-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .call-hud-window {
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .call-hud-body {
+    padding: 14px 18px;
+    gap: 12px;
+  }
+
+  .call-orb-center {
+    width: 100px;
+    height: 100px;
+  }
+
+  .call-orb-inner {
+    width: 68px;
+    height: 68px;
+  }
+
+  .call-transcript-box {
+    max-height: 110px;
+  }
+
+  .call-controls-bar {
+    padding: 10px 16px;
+  }
+}
+
 /* Microphone Level Indicator & In-Call Chat Input */
 .user-mic-level-box {
   display: flex;

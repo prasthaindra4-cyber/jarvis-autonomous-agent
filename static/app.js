@@ -494,11 +494,19 @@ function initJarvisTelephony() {
         // Play phone connect sound
         sfxCallConnect();
 
+        callStateText.textContent = "JARVIS CONNECTED";
+        callStateSub.textContent = "Terhubung ke JARVIS AI Core...";
+        if (transcriptBox) transcriptBox.innerHTML = '';
+
+        const greeting = "Halo Bos! JARVIS aktif dan terhubung. Saya sedang mendengarkan. Ada yang bisa saya bantu atau kerjakan untuk Anda?";
+        addTranscriptLine('JARVIS', greeting);
+        speakInCall(greeting);
+
         // 1. Request microphone hardware immediately
         await setupMicrophoneHardware();
 
         // 2. Start speech recognition
-        if (recognition) {
+        if (recognition && !isJarvisSpeaking) {
             try { recognition.start(); } catch (_) {}
         }
 
@@ -512,16 +520,6 @@ function initJarvisTelephony() {
             if (pillTimer) pillTimer.textContent = `${mins}:${secs}`;
         }, 1000);
 
-        callStateText.textContent = "JARVIS CONNECTED";
-        callStateSub.textContent = "Terhubung ke JARVIS AI Core...";
-        if (transcriptBox) transcriptBox.innerHTML = '';
-
-        // Initial Greeting from JARVIS
-        setTimeout(() => {
-            const greeting = "Halo Bos! JARVIS aktif dan terhubung. Saya sedang mendengarkan. Ada yang bisa saya bantu atau kerjakan untuk Anda?";
-            addTranscriptLine('JARVIS', greeting);
-            speakInCall(greeting);
-        }, 500);
     }
 
     function endJarvisCall() {
@@ -546,7 +544,13 @@ function initJarvisTelephony() {
     }
 
     function speakInCall(text) {
-        if (!('speechSynthesis' in window)) return;
+        if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+            isJarvisSpeaking = false;
+            callStateText.textContent = "TEXT CHAT AVAILABLE";
+            callStateSub.textContent = "Browser ini tidak mendukung suara otomatis. Anda tetap bisa mengetik.";
+            if (micStatusText) micStatusText.textContent = "Text-to-speech tidak didukung browser.";
+            return;
+        }
 
         window.speechSynthesis.cancel();
         isJarvisSpeaking = true;
@@ -594,6 +598,9 @@ function initJarvisTelephony() {
 
         utterance.onerror = () => {
             isJarvisSpeaking = false;
+            callStateText.textContent = "VOICE UNAVAILABLE";
+            callStateSub.textContent = "Periksa volume perangkat atau pilih suara yang tersedia di browser.";
+            if (micStatusText) micStatusText.textContent = "Suara gagal diputar; chat teks tetap tersedia.";
             if (isCallActive && recognition) {
                 setTimeout(() => {
                     try { recognition.start(); } catch (_) {}
