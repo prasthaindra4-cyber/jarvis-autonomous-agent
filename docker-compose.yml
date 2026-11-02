@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  jarvis-backend:
+    build: .
+    container_name: jarvis_ai_agent
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=JARVIS Autonomous AI Agent Core
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=gemini-1.5-pro
+      - SQLITE_DB_PATH=/app/data/jarvis_memory.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

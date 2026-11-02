@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Environment Variables & Secrets (Crucial: do not leak API Keys)
+.env
+.env.local
+
+# Databases & Runtime State
+*.db
+*.sqlite3
+jarvis_memory.db
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs & Temp
+*.log
+.system_generated/
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
