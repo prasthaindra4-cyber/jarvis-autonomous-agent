@@ -420,6 +420,9 @@ function initJarvisTelephony() {
             });
 
             const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || `Server error (${response.status})`);
+            }
             const reply = data.reply_text || "Saya telah menyelesaikan tugas tersebut.";
 
             if (data.is_task && data.task_result) {
@@ -430,7 +433,7 @@ function initJarvisTelephony() {
             addTranscriptLine('JARVIS', reply);
             speakInCall(reply);
         } catch (err) {
-            const errMsg = "Maaf, terjadi kendala saat memproses instruksi.";
+            const errMsg = `Maaf, instruksi tidak dapat diproses: ${err.message}`;
             addTranscriptLine('JARVIS', errMsg);
             speakInCall(errMsg);
         }
@@ -611,19 +614,6 @@ function initJarvisTelephony() {
     }
 }
 
-        window.speechSynthesis.speak(utterance);
-    }
-
-    function addTranscriptLine(sender, text) {
-        if (!transcriptBox) return;
-        const line = document.createElement('div');
-        line.className = `transcript-line ${sender.toLowerCase()}`;
-        line.innerHTML = `<strong>${sender}:</strong> <span>${escapeHtml(text)}</span>`;
-        transcriptBox.appendChild(line);
-        transcriptBox.scrollTop = transcriptBox.scrollHeight;
-    }
-}
-
 // ==========================================
 // 5. MODAL TASK EXECUTION (TEXT HUD)
 // ==========================================
@@ -679,6 +669,9 @@ function initInteractions() {
                 });
 
                 const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || `Server error (${response.status})`);
+                }
                 renderExecutionResult(data, streamBox);
 
                 // Vocal feedback
