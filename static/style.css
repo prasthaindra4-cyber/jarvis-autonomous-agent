@@ -1732,3 +1732,30 @@ body {
   font-size: 11px;
   cursor: pointer;
 }
+
+.browser-access-note {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 0 4px;
+}
+
+.browser-action-link {
+  display: inline-flex;
+  align-items: center;
+  margin: 6px 0 2px 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-cyan);
+  border-radius: 6px;
+  background: rgba(0, 240, 255, 0.08);
+  color: var(--cyan-primary);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.browser-action-link:hover,
+.browser-action-link:focus-visible {
+  border-color: var(--cyan-primary);
+  background: rgba(0, 240, 255, 0.16);
+  outline: none;
+}

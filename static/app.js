@@ -184,6 +184,75 @@ let pendingSpeechText = '';
 let isProcessingSpeech = false;
 const voiceSessionId = `voice_call_${window.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`}`;
 
+const browserShortcuts = {
+    google: 'https://www.google.com/',
+    youtube: 'https://www.youtube.com/',
+    instagram: 'https://www.instagram.com/',
+    tiktok: 'https://www.tiktok.com/',
+    whatsapp: 'https://web.whatsapp.com/',
+    github: 'https://github.com/',
+    gmail: 'https://mail.google.com/',
+    spotify: 'https://open.spotify.com/',
+    facebook: 'https://www.facebook.com/',
+    chatgpt: 'https://chatgpt.com/',
+    maps: 'https://maps.google.com/'
+};
+
+function getBrowserAction(message) {
+    const normalized = message.trim().replace(/[.!?]+$/, '');
+    const searchMatch = normalized.match(/^(?:jarvis[,\s]+)?(?:tolong\s+)?(?:cari|search)\s+(?:di\s+(?:google|web)\s+)?(.+)$/i);
+    if (searchMatch) {
+        const query = searchMatch[1].trim();
+        if (!query) return { error: 'Sebutkan kata atau topik yang ingin dicari.' };
+        return {
+            label: `hasil pencarian: ${query}`,
+            url: `https://www.google.com/search?q=${encodeURIComponent(query)}`
+        };
+    }
+
+    const appMatch = normalized.match(/^(?:jarvis[,\s]+)?(?:tolong\s+)?(?:buka|jalankan)\s+(?:aplikasi|app)\s+(.+)$/i);
+    if (appMatch) {
+        return { error: 'Membuka aplikasi desktop belum didukung dari website. Browser membatasi akses ke aplikasi dan terminal di perangkat Anda.' };
+    }
+
+    const openMatch = normalized.match(/^(?:jarvis[,\s]+)?(?:tolong\s+)?(?:buka|bukakan)\s+(?:(?:website|situs|url|tab|halaman)\s+)?(.+)$/i);
+    if (!openMatch) return null;
+
+    const destination = openMatch[1].trim().replace(/\s+(?:dong|ya|tolong)$/i, '');
+    const shortcut = browserShortcuts[destination.toLowerCase()];
+    if (shortcut) {
+        return { label: destination, url: shortcut };
+    }
+
+    let url;
+    try {
+        url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(destination) ? destination : `https://${destination}`);
+    } catch (error) {
+        if (!(error instanceof TypeError)) throw error;
+        return { error: `Saya belum mengenali alamat "${destination}". Sebutkan nama situs atau domain seperti example.com.` };
+    }
+
+    const hostname = url.hostname.toLowerCase();
+    const isIpAddress = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':');
+    const isLocalHost = hostname === 'localhost'
+        || hostname.endsWith('.localhost')
+        || hostname.endsWith('.local')
+        || hostname.endsWith('.internal')
+        || hostname.endsWith('.lan')
+        || hostname.endsWith('.intranet')
+        || hostname.endsWith('.home.arpa')
+        || ['.test', '.example', '.invalid'].some(suffix => hostname.endsWith(suffix));
+    const hasValidDomain = hostname.includes('.')
+        && hostname.split('.').every(label => /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(label));
+
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+        || isIpAddress || isLocalHost || !hasValidDomain) {
+        return { error: 'Demi keamanan, JARVIS hanya dapat membuka website publik dengan alamat http atau https yang valid.' };
+    }
+
+    return { label: url.hostname, url: url.href };
+}
+
 // Sound Effects via Web Audio API (Synthesized Sci-Fi Audio)
 function playTone(freq1, freq2, duration, type = 'sine') {
     try {
@@ -431,6 +500,21 @@ function initJarvisTelephony() {
         callStateText.textContent = "JARVIS ANALYZING & EXECUTING...";
         callStateSub.textContent = `Memproses: "${text}"`;
         playTone(600, 750, 0.2);
+
+        const browserAction = getBrowserAction(text);
+        if (browserAction) {
+            const reply = browserAction.error
+                ? browserAction.error
+                : `Saya siapkan ${browserAction.label}. Klik tombol di bawah untuk membukanya di tab baru.`;
+            addTranscriptLine('JARVIS', reply);
+            if (browserAction.url) addBrowserActionLink(browserAction);
+            callStateText.textContent = browserAction.error ? "AKSI TIDAK TERSEDIA" : "KONFIRMASI BROWSER";
+            callStateSub.textContent = browserAction.error
+                ? "Perintah ini tidak dijalankan."
+                : "Website baru hanya dibuka setelah Anda menekan tombol.";
+            speakInCall(reply);
+            return;
+        }
 
         try {
             const response = await fetch('/api/v1/agent/chat', {
@@ -750,6 +834,21 @@ function initJarvisTelephony() {
         line.className = `transcript-line ${sender.toLowerCase()}`;
         line.innerHTML = `<strong>${sender}:</strong> <span>${escapeHtml(text)}</span>`;
         transcriptBox.appendChild(line);
+        transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    }
+
+    function addBrowserActionLink(action) {
+        if (!transcriptBox) return;
+        const actionLine = document.createElement('div');
+        actionLine.className = 'transcript-line jarvis browser-action';
+        const link = document.createElement('a');
+        link.className = 'browser-action-link';
+        link.href = action.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = `Buka ${action.label} di tab baru`;
+        actionLine.appendChild(link);
+        transcriptBox.appendChild(actionLine);
         transcriptBox.scrollTop = transcriptBox.scrollHeight;
     }
 }

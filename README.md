@@ -178,5 +178,8 @@ docker-compose up -d --build
 1. Buka dashboard di `http://localhost:8000`, lalu mulai panggilan JARVIS.
 2. Klik **Bagikan Tab / Layar** dan pilih tab/jendela yang ingin dianalisis melalui dialog browser.
 3. Saat soal terlihat, klik **Analisis yang Terlihat**. Gambar layar dikirim ke model Gemini untuk dibaca, lalu jawaban singkat ditampilkan dan dibacakan.
+4. Saat panggilan, ucapkan **“buka YouTube”**, **“buka example.com”**, atau **“cari berita AI”**. JARVIS menampilkan tombol konfirmasi dan membuka website/pencarian di tab baru setelah tombol ditekan.
 
 Analisis gambar memerlukan `GEMINI_API_KEY` dan model Gemini yang mendukung input gambar. Jangan bagikan layar yang menampilkan kata sandi atau data pribadi. Browser tidak mengizinkan aplikasi localhost membaca atau mengisi situs lain secara diam-diam; JARVIS memberikan jawaban untuk Anda tinjau, bukan mengirim formulir.
+
+Website ini berjalan di dalam sandbox browser. Karena itu, JARVIS hanya membuka alamat publik HTTP/HTTPS setelah klik konfirmasi; ia tidak dapat menjalankan aplikasi desktop, terminal, atau mengakses/mengubah file perangkat dari halaman web. Akses semacam itu memerlukan aplikasi pendamping lokal dengan izin terpisah dan tidak diberikan secara otomatis.
