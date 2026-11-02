@@ -619,6 +619,8 @@ function initJarvisTelephony() {
 // ==========================================
 function initInteractions() {
     const modal = document.getElementById('taskModal');
+    const layoutToggleBtn = document.getElementById('layoutToggleBtn');
+    const dashboard = document.querySelector('.dashboard-content');
     const openBtns = [
         document.getElementById('quickNewTaskBtn'),
         document.getElementById('quickWorkflowBtn')
@@ -627,6 +629,14 @@ function initInteractions() {
     const submitBtn = document.getElementById('submitTaskBtn');
     const promptInput = document.getElementById('promptInput');
     const streamBox = document.getElementById('executionStream');
+
+    if (layoutToggleBtn && dashboard) {
+        layoutToggleBtn.addEventListener('click', () => {
+            const isCompact = dashboard.classList.toggle('compact-layout');
+            layoutToggleBtn.setAttribute('aria-pressed', String(isCompact));
+            layoutToggleBtn.title = isCompact ? 'Show standard layout' : 'Toggle compact layout';
+        });
+    }
 
     openBtns.forEach(btn => {
         if (btn) btn.addEventListener('click', () => modal.classList.add('open'));

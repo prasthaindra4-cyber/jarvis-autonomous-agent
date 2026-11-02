@@ -483,6 +483,15 @@ body {
   gap: 14px;
 }
 
+.dashboard-content.compact-layout {
+  padding: 10px 14px 80px;
+  gap: 8px;
+}
+
+.dashboard-content.compact-layout .hud-card {
+  padding: 9px;
+}
+
 /* Glass Panels */
 .hud-card {
   background: var(--bg-panel);
