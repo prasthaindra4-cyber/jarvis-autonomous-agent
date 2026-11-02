@@ -31,7 +31,8 @@ class LLMProvider:
         user_prompt: str,
         model_name: Optional[str] = None,
         temperature: float = 0.2,
-        response_schema: Optional[type] = None
+        response_schema: Optional[type] = None,
+        fallback_on_error: bool = True,
     ) -> str:
         """
         Panggilan asynchronous ke LLM (atau mock handler jika offline).
@@ -42,8 +43,10 @@ class LLMProvider:
                 genai.configure(api_key=settings.GEMINI_API_KEY)
                 self.api_key = settings.GEMINI_API_KEY
                 self.is_live = True
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.error("Failed to configure Gemini API: %s", exc)
+                if not fallback_on_error:
+                    raise RuntimeError("Konfigurasi Gemini gagal. Periksa GEMINI_API_KEY.") from exc
 
         model_name = model_name or settings.GEMINI_MODEL
         
@@ -59,10 +62,34 @@ class LLMProvider:
                 response = await model.generate_content_async(user_prompt)
                 return response.text
             except Exception as e:
-                logger.error(f"Live Gemini API error: {e}. Falling back to rule-based agent simulator.")
+                logger.error("Live Gemini API error: %s", e)
+                if not fallback_on_error:
+                    raise RuntimeError("Model AI gagal menjawab. Periksa konfigurasi dan koneksi Gemini.") from e
         
         # Intelligent Offline / Mock Fallback Simulator
         return await self._simulate_response(system_instruction, user_prompt)
+
+    async def analyze_image(self, system_instruction: str, user_prompt: str, mime_type: str, image_data: bytes) -> str:
+        if not self.is_live and settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            self.api_key = settings.GEMINI_API_KEY
+            self.is_live = True
+
+        if not self.is_live:
+            raise RuntimeError("Analisis layar memerlukan GEMINI_API_KEY dan model vision yang aktif.")
+
+        model = genai.GenerativeModel(
+            model_name=settings.GEMINI_MODEL,
+            system_instruction=system_instruction,
+            generation_config=genai.GenerationConfig(temperature=0.2),
+        )
+        response = await model.generate_content_async([
+            user_prompt,
+            {"inline_data": {"mime_type": mime_type, "data": image_data}},
+        ])
+        if not response.text:
+            raise RuntimeError("Model tidak mengembalikan jawaban dari gambar layar.")
+        return response.text.strip()
 
     async def _simulate_response(self, system_instruction: str, user_prompt: str) -> str:
         """

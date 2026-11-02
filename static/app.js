@@ -180,6 +180,9 @@ let micAnalyser = null;
 let micAnimFrame = null;
 let silenceTimer = null;
 let currentSpeechAccumulator = '';
+let pendingSpeechText = '';
+let isProcessingSpeech = false;
+const voiceSessionId = `voice_call_${window.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`}`;
 
 // Sound Effects via Web Audio API (Synthesized Sci-Fi Audio)
 function playTone(freq1, freq2, duration, type = 'sine') {
@@ -239,6 +242,11 @@ function initJarvisTelephony() {
     const btnRequestMic = document.getElementById('btnRequestMic');
     const callTextInput = document.getElementById('callTextInput');
     const callSendBtn = document.getElementById('callSendBtn');
+    const shareScreenBtn = document.getElementById('shareScreenBtn');
+    const analyzeScreenBtn = document.getElementById('analyzeScreenBtn');
+    const screenShareStatus = document.getElementById('screenShareStatus');
+    const screenShareVideo = document.getElementById('screenShareVideo');
+    let screenStream = null;
 
     // 1. Microphone Hardware Acquisition & Live Volume Visualizer
     async function setupMicrophoneHardware() {
@@ -321,9 +329,13 @@ function initJarvisTelephony() {
         if (langSelect) {
             langSelect.addEventListener('change', () => {
                 recognition.lang = langSelect.value;
-                if (isCallActive && !isJarvisSpeaking) {
+                if (isCallActive && !isJarvisSpeaking && !isProcessingSpeech) {
                     try { recognition.stop(); } catch (_) {}
-                    setTimeout(() => { try { recognition.start(); } catch (_) {} }, 200);
+                    setTimeout(() => {
+                        if (isCallActive && !isJarvisSpeaking && !isProcessingSpeech) {
+                            try { recognition.start(); } catch (_) {}
+                        }
+                    }, 200);
                 }
             });
         }
@@ -333,7 +345,7 @@ function initJarvisTelephony() {
         };
 
         recognition.onresult = (event) => {
-            if (isJarvisSpeaking) return;
+            if (isJarvisSpeaking || isProcessingSpeech) return;
 
             let interimStr = '';
             let finalStr = '';
@@ -346,19 +358,24 @@ function initJarvisTelephony() {
                 }
             }
 
-            const currentSpoken = (finalStr || interimStr).trim();
+            if (finalStr) currentSpeechAccumulator += `${finalStr.trim()} `;
+            const currentSpoken = `${currentSpeechAccumulator}${interimStr}`.trim();
             if (!currentSpoken) return;
+            pendingSpeechText = currentSpoken;
 
             // Live preview user speech in transcript
             showInterimUserSpeech(currentSpoken);
 
-            // Silence debounce: If user pauses for 1100ms, auto-dispatch to JARVIS!
+            // Debounce interim recognition; keep finalized chunks so longer phrases arrive once.
             clearTimeout(silenceTimer);
             silenceTimer = setTimeout(() => {
-                if (currentSpoken.length >= 2 && !isJarvisSpeaking) {
-                    commitUserSpeech(currentSpoken);
+                const text = (pendingSpeechText || currentSpeechAccumulator).trim();
+                currentSpeechAccumulator = '';
+                pendingSpeechText = '';
+                if (text.length >= 2 && !isJarvisSpeaking && !isProcessingSpeech) {
+                    commitUserSpeech(text);
                 }
-            }, 1100);
+            }, finalStr ? 700 : 1600);
         };
 
         recognition.onerror = (e) => {
@@ -368,7 +385,7 @@ function initJarvisTelephony() {
                 if (micStatusText) micStatusText.textContent = "⚠️ Izin mic belum diberikan.";
             } else if (e.error === 'network') {
                 if (micStatusText) micStatusText.textContent = "Koneksi suara offline. Anda bisa gunakan chat di bawah.";
-            } else if (isCallActive && !isJarvisSpeaking && e.error === 'no-speech') {
+            } else if (isCallActive && !isJarvisSpeaking && !isProcessingSpeech && e.error === 'no-speech') {
                 // Normal silence timeout, restart recognition
                 try { recognition.start(); } catch (_) {}
             }
@@ -376,7 +393,7 @@ function initJarvisTelephony() {
 
         recognition.onend = () => {
             // Keep listening continuously if call is still active
-            if (isCallActive && !isJarvisSpeaking) {
+            if (isCallActive && !isJarvisSpeaking && !isProcessingSpeech) {
                 setTimeout(() => {
                     try { recognition.start(); } catch (_) {}
                 }, 150);
@@ -399,7 +416,14 @@ function initJarvisTelephony() {
     }
 
     async function commitUserSpeech(text) {
+        if (isProcessingSpeech || !text.trim()) return;
+        isProcessingSpeech = true;
         clearTimeout(silenceTimer);
+        currentSpeechAccumulator = '';
+        pendingSpeechText = '';
+        if (recognition) {
+            try { recognition.stop(); } catch (_) {}
+        }
         const interimEl = document.getElementById('interimUserBubble');
         if (interimEl) interimEl.remove();
 
@@ -414,7 +438,7 @@ function initJarvisTelephony() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: text,
-                    session_id: 'voice_call_session',
+                    session_id: voiceSessionId,
                     voice_mode: true
                 })
             });
@@ -444,6 +468,10 @@ function initJarvisTelephony() {
         const handleSend = () => {
             const txt = callTextInput.value.trim();
             if (!txt) return;
+            if (isProcessingSpeech) {
+                callStateSub.textContent = "Tunggu sampai jawaban JARVIS selesai terlebih dahulu.";
+                return;
+            }
             callTextInput.value = '';
             commitUserSpeech(txt);
         };
@@ -451,6 +479,103 @@ function initJarvisTelephony() {
         callTextInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') handleSend();
         });
+    }
+
+    if (shareScreenBtn) {
+        shareScreenBtn.addEventListener('click', () => {
+            if (screenStream) stopScreenShare();
+            else startScreenShare();
+        });
+    }
+
+    if (analyzeScreenBtn) {
+        analyzeScreenBtn.addEventListener('click', analyzeSharedScreen);
+    }
+
+    async function startScreenShare() {
+        if (!navigator.mediaDevices?.getDisplayMedia) {
+            if (screenShareStatus) screenShareStatus.textContent = "Browser ini tidak mendukung berbagi layar.";
+            return;
+        }
+
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { frameRate: 5 },
+                audio: false
+            });
+            screenShareVideo.srcObject = screenStream;
+            await screenShareVideo.play();
+            analyzeScreenBtn.disabled = false;
+            shareScreenBtn.textContent = "Hentikan Berbagi";
+            screenShareStatus.textContent = "Tab dibagikan. Klik Analisis yang Terlihat saat ada soal di layar.";
+            screenStream.getVideoTracks()[0].addEventListener('ended', stopScreenShare, { once: true });
+        } catch (error) {
+            if (error.name === 'NotAllowedError') {
+                screenShareStatus.textContent = "Berbagi layar dibatalkan atau tidak diizinkan.";
+                return;
+            }
+            screenShareStatus.textContent = `Gagal membagikan layar: ${error.message}`;
+        }
+    }
+
+    function stopScreenShare() {
+        if (screenStream) {
+            screenStream.getTracks().forEach(track => track.stop());
+            screenStream = null;
+        }
+        if (screenShareVideo) screenShareVideo.srcObject = null;
+        if (analyzeScreenBtn) analyzeScreenBtn.disabled = true;
+        if (shareScreenBtn) {
+            shareScreenBtn.textContent = "Bagikan Tab / Layar";
+        }
+        if (screenShareStatus) screenShareStatus.textContent = "Berbagi layar dihentikan.";
+    }
+
+    async function analyzeSharedScreen() {
+        if (!screenShareVideo || !screenStream || !screenShareVideo.videoWidth) {
+            if (screenShareStatus) screenShareStatus.textContent = "Pilih tab atau layar terlebih dahulu.";
+            return;
+        }
+
+        analyzeScreenBtn.disabled = true;
+        isProcessingSpeech = true;
+        if (recognition) {
+            try { recognition.stop(); } catch (_) {}
+        }
+        screenShareStatus.textContent = "JARVIS sedang membaca gambar layar...";
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, 1600 / screenShareVideo.videoWidth);
+        canvas.width = Math.round(screenShareVideo.videoWidth * scale);
+        canvas.height = Math.round(screenShareVideo.videoHeight * scale);
+        canvas.getContext('2d').drawImage(screenShareVideo, 0, 0, canvas.width, canvas.height);
+        const [header, imageBase64] = canvas.toDataURL('image/jpeg', 0.82).split(',');
+
+        try {
+            const response = await fetch('/api/v1/agent/analyze-screen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_base64: imageBase64,
+                    mime_type: header.match(/data:(.*);base64/)?.[1] || 'image/jpeg',
+                    session_id: voiceSessionId
+                })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || `Server error (${response.status})`);
+            addTranscriptLine('JARVIS', data.answer);
+            callStateText.textContent = "SCREEN ANALYSIS COMPLETE";
+            callStateSub.textContent = "Jawaban ditampilkan dan dibacakan. Tinjau sebelum digunakan.";
+            screenShareStatus.textContent = "Selesai. JARVIS tidak mengisi atau mengirim jawaban ke situs lain.";
+            speakInCall(data.answer);
+        } catch (error) {
+            isProcessingSpeech = false;
+            screenShareStatus.textContent = `Gagal menganalisis layar: ${error.message}`;
+            if (isCallActive && recognition) {
+                try { recognition.start(); } catch (_) {}
+            }
+        } finally {
+            analyzeScreenBtn.disabled = !screenStream;
+        }
     }
 
     // Start Call Trigger
@@ -524,6 +649,8 @@ function initJarvisTelephony() {
 
     function endJarvisCall() {
         isCallActive = false;
+        isProcessingSpeech = false;
+        isJarvisSpeaking = false;
         clearInterval(callTimerInterval);
         if (silenceTimer) clearTimeout(silenceTimer);
         if (window.speechSynthesis) window.speechSynthesis.cancel();
@@ -531,6 +658,7 @@ function initJarvisTelephony() {
             try { recognition.stop(); } catch (_) {}
         }
         if (micAnimFrame) cancelAnimationFrame(micAnimFrame);
+        stopScreenShare();
         if (micStream) {
             micStream.getTracks().forEach(t => t.stop());
             micStream = null;
@@ -546,6 +674,7 @@ function initJarvisTelephony() {
     function speakInCall(text) {
         if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
             isJarvisSpeaking = false;
+            isProcessingSpeech = false;
             callStateText.textContent = "TEXT CHAT AVAILABLE";
             callStateSub.textContent = "Browser ini tidak mendukung suara otomatis. Anda tetap bisa mengetik.";
             if (micStatusText) micStatusText.textContent = "Text-to-speech tidak didukung browser.";
@@ -569,20 +698,23 @@ function initJarvisTelephony() {
         const voices = window.speechSynthesis.getVoices();
         if (isEnglish) {
             utterance.lang = 'en-GB';
-            const britishVoice = voices.find(v => v.lang.includes('en-GB') || v.name.includes('UK') || v.name.includes('British') || v.name.includes('George'));
+            const britishVoices = voices.filter(v => v.lang.includes('en-GB'));
+            const britishVoice = britishVoices.find(v => /\bmale\b|\bman\b/i.test(v.name)) || britishVoices[0];
             if (britishVoice) utterance.voice = britishVoice;
-            utterance.rate = 1.0;
-            utterance.pitch = 0.95;
+            utterance.rate = 0.98;
+            utterance.pitch = britishVoice && /\bmale\b|\bman\b/i.test(britishVoice.name) ? 0.98 : 0.8;
         } else {
             utterance.lang = 'id-ID';
-            const indoVoice = voices.find(v => v.lang.includes('id') || v.name.includes('Indonesian') || v.name.includes('Damayanti') || v.name.includes('Ardi'));
+            const indoVoices = voices.filter(v => v.lang.toLowerCase().startsWith('id'));
+            const indoVoice = indoVoices.find(v => /\bmale\b|\bman\b|pria|laki-laki|putra|ardi|budi|dimas/i.test(v.name)) || indoVoices[0];
             if (indoVoice) utterance.voice = indoVoice;
-            utterance.rate = 1.05;
-            utterance.pitch = 1.0;
+            utterance.rate = 0.98;
+            utterance.pitch = indoVoice && /\bmale\b|\bman\b|pria|laki-laki|putra|ardi|budi|dimas/i.test(indoVoice.name) ? 0.98 : 0.75;
         }
 
         utterance.onend = () => {
             isJarvisSpeaking = false;
+            isProcessingSpeech = false;
             callStateText.textContent = "JARVIS LISTENING...";
             callStateSub.textContent = "Silakan bicara, saya mendengarkan...";
             if (micStatusText) micStatusText.textContent = "Mendengarkan suara Anda...";
@@ -598,6 +730,7 @@ function initJarvisTelephony() {
 
         utterance.onerror = () => {
             isJarvisSpeaking = false;
+            isProcessingSpeech = false;
             callStateText.textContent = "VOICE UNAVAILABLE";
             callStateSub.textContent = "Periksa volume perangkat atau pilih suara yang tersedia di browser.";
             if (micStatusText) micStatusText.textContent = "Suara gagal diputar; chat teks tetap tersedia.";

@@ -142,7 +142,7 @@ Jalankan seluruh pengujian otomatis dengan pytest:
 .venv/bin/pytest tests/ -v
 ```
 
-Hasil uji: **11/11 tests PASSED**.
+Hasil uji terakhir: **15 tests PASSED**.
 
 ---
 
@@ -172,3 +172,11 @@ Akses dokumentasi interaktif Swagger UI di browser:
 ```bash
 docker-compose up -d --build
 ```
+
+### F. Percakapan Suara & Analisis Layar
+
+1. Buka dashboard di `http://localhost:8000`, lalu mulai panggilan JARVIS.
+2. Klik **Bagikan Tab / Layar** dan pilih tab/jendela yang ingin dianalisis melalui dialog browser.
+3. Saat soal terlihat, klik **Analisis yang Terlihat**. Gambar layar dikirim ke model Gemini untuk dibaca, lalu jawaban singkat ditampilkan dan dibacakan.
+
+Analisis gambar memerlukan `GEMINI_API_KEY` dan model Gemini yang mendukung input gambar. Jangan bagikan layar yang menampilkan kata sandi atau data pribadi. Browser tidak mengizinkan aplikasi localhost membaca atau mengisi situs lain secara diam-diam; JARVIS memberikan jawaban untuk Anda tinjau, bukan mengirim formulir.
